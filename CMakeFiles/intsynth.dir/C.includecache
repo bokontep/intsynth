@@ -1,0 +1,22 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/administrator/intsynth/client.c
+stdio.h
+-
+errno.h
+-
+unistd.h
+-
+stdlib.h
+-
+string.h
+-
+jack/jack.h
+-
+

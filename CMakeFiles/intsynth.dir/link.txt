@@ -1,0 +1,1 @@
+/usr/bin/c++     CMakeFiles/intsynth.dir/src/client.cpp.o CMakeFiles/intsynth.dir/src/ADSR.cpp.o CMakeFiles/intsynth.dir/src/Util.cpp.o  -o intsynth -ljack -lpthread 
