@@ -64,7 +64,7 @@ int lcdRows = 2;
 #define YELLOW_BUTTON 2
 #define AUDIOBUFSIZE 64000
 #define SAMPLE_RATE 44100
-#define NUM_VOICES 4
+#define NUM_VOICES 16
 #define NUM_DRUMS 0
 #define WTLEN 256
 #define MIDI_COMMAND 128
