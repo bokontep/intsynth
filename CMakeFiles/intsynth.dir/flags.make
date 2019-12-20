@@ -4,7 +4,7 @@
 # compile CXX with /usr/bin/c++
 CXX_FLAGS = -Wall -Wextra -O5  
 
-CXX_DEFINES = 
+CXX_DEFINES = -DUSE_RTAUDIO
 
 CXX_INCLUDES = 
 

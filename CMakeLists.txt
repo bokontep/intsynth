@@ -2,13 +2,14 @@ cmake_minimum_required(VERSION 3.10)
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
+add_definitions(-DUSE_RTAUDIO)
 set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O5")
 project(intsynth)
-find_library(JACK_LIB jack)
-
+find_library(RTMIDI_LIB rtmidi)
+find_library(RTAUDIO_LIB rtaudio)
 
 add_executable(intsynth src/client.cpp src/ADSR.cpp src/Util.cpp)
 
-target_link_libraries(intsynth jack pthread)
+target_link_libraries(intsynth rtmidi rtaudio)
