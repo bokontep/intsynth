@@ -3,16 +3,15 @@
  * @brief This simple client demonstrates the most basic features of JACK
  * as they would be used by many applications.
  */
-
+#include "rtaudio/RtAudio.h"
+#include "rtmidi/RtMidi.h"
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <jack/jack.h>
-#include <jack/midiport.h>
-#include <pthread.h>
+
 #ifndef ESP32
 #define IRAM_ATTR 
 #endif
@@ -26,13 +25,11 @@
 
 volatile long t = 0;
 volatile bool running = true;
-jack_port_t *input_port;
-jack_port_t *output_port;
-jack_port_t *midi_input_port;
-jack_client_t *client;
-void* port_buf;
+RtMidiIn *midiin = 0;
+RtMidiOut *midiout = 0;
+RtAudio dac;
 
-pthread_t thread;
+
 
 int8_t fp_sinWaveTable[WTLEN];
 int8_t fp_sawWaveTable[WTLEN];
@@ -86,11 +83,11 @@ void initFpSin()
 
 void initFpTri()
 {
-  for(int i=0;i<128;i++)
+  for(int i=0;i<(WTLEN/2);i++)
   {
     fp_triWaveTable[i] = (int8_t)(127.0*(-1.0+i*(1.0/((double)WTLEN/2.0))));
   }
-  for(int i=128;i<256;i++)
+  for(int i=(WTLEN/2);i<WTLEN;i++)
   {
     fp_triWaveTable[i] = (int8_t)(127.0*(1.0 - i*(1.0/((double)WTLEN/2.0))));
   }
@@ -98,7 +95,7 @@ void initFpTri()
 }
 void initFpSqu()
 {
-  for(int i=0;i<256;i++)
+  for(int i=0;i<WTLEN;i++)
   {
     fp_squWaveTable[i] = (i<(WTLEN/2)?127:-127);
   }
@@ -106,7 +103,7 @@ void initFpSqu()
 }
 void initFpSaw()
 {
-  for(int i = 0;i<256;i++)
+  for(int i = 0;i<WTLEN;i++)
   {
     fp_sawWaveTable[i] = (int8_t)(127*(-1.0 + (2.0/WTLEN)*i));
   }
@@ -170,8 +167,8 @@ void setup()
   {
     drums_notes[i] = -1;
   }
-  initFpSaw();
   initFpSin();
+  initFpSaw();
   initFpSqu();
   initFpTri();  
   initFpRnd();
@@ -184,28 +181,20 @@ void setup()
   for(int i =0;i<NUM_VOICES;i++)
   {
     voices[i] = SynthVoice(SAMPLE_RATE);
-    voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_sinWaveTable[0]);
+    voices[i].AddOsc1SharedWaveTable(WTLEN,fp_sinWaveTable);
     voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_sawWaveTable[0]);
     voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_triWaveTable[0]);
     voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_squWaveTable[0]);
     voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_plsWaveTable[0]);
     voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_rndWaveTable[0]);
-
-    
-    //voices[i].AddOsc1WaveTable(WTLEN,&fp_plsWaveTable[0]);
     voices[i].SetOsc1ADSR(10,1,1.0,1000);
-    voices[i].AddOsc2WaveTable(WTLEN,&fp_sinWaveTable[0]);
-    //voices[i].AddOsc1WaveTable(WTLEN,&fp_plsWaveTable[0]);
     
+    voices[i].AddOsc2SharedWaveTable(WTLEN,fp_sinWaveTable);
     voices[i].AddOsc2SharedWaveTable(WTLEN,&fp_sawWaveTable[0]);
     voices[i].AddOsc2SharedWaveTable(WTLEN,&fp_triWaveTable[0]);
     voices[i].AddOsc2SharedWaveTable(WTLEN,&fp_squWaveTable[0]);
     voices[i].AddOsc2SharedWaveTable(WTLEN,&fp_plsWaveTable[0]);
     voices[i].AddOsc2SharedWaveTable(WTLEN,&fp_rndWaveTable[0]);
-
-    
-    
-    
     voices[i].SetOsc2ADSR(10,1,1.0,1000);
     
   }
@@ -280,7 +269,7 @@ void handleNoteOn(uint8_t channel, uint8_t note, uint8_t velocity)
       }
       if(drums_notes[i]>maxnote)
       {
-        maxnote = voices_notes[i];
+        maxnote = drums_notes[i];
         maxnoteidx = i;
       }
     }
@@ -362,7 +351,9 @@ void handleRotaryData(int rotary, int state, uint8_t data, int* value_pickup)
             int divisor = 127/voices[i].GetOsc2WaveTableCount();
             voices[i].MidiOsc2Wave(data/divisor);
           }
+          break;
         case 5:
+
         {
           for(int i=0;i<NUM_VOICES;i++)
           {
@@ -371,6 +362,7 @@ void handleRotaryData(int rotary, int state, uint8_t data, int* value_pickup)
             
           }
         }
+        break;
         case 6:
           for(int i=0;i<NUM_VOICES;i++)
           {
@@ -561,7 +553,7 @@ void handleCC(uint8_t channel, uint8_t cc, uint8_t data, int* vpickup)
   
 }
 
-
+/*
 void processMidi(jack_midi_data_t* serialData, int len )
 {
   
@@ -587,7 +579,7 @@ void processMidi(jack_midi_data_t* serialData, int len )
           break;
           case 1:
 		  printf("NOTEON    CH:%02d note:%03d vel:%03d\n",channel,data1,data2);
-          //printMidiMessage(command,data1,data2);
+          //printMidiMessage(command>,data1,data2);
           handleNoteOn(channel,data1,data2);
           mstate = WAIT_COMMAND;
           break;
@@ -608,160 +600,153 @@ void processMidi(jack_midi_data_t* serialData, int len )
         
     
   }
-  
-
-int
-process (jack_nframes_t nframes, void *arg)
-{
-	void* port_buf = jack_port_get_buffer(midi_input_port,nframes);
-	jack_midi_event_t midiEvent;
-	jack_nframes_t event_count = jack_midi_get_event_count(port_buf);
-	if(event_count>0)
-	{
-		for(int i=0;i<event_count;i++)
-		{
-			jack_midi_event_get(&midiEvent,port_buf,i);
-			
-			processMidi(midiEvent.buffer,midiEvent.size);
-		}
-		
-	}
-	jack_default_audio_sample_t* out;
-	out = (jack_default_audio_sample_t*)jack_port_get_buffer(output_port,nframes);
-	for(int i=0;i<nframes;i++)
-	{
-		out[i] = getSample();	
-		
-	}
-	return 0;      
-}
-
-
-/**
- * JACK calls this shutdown_callback if the server ever shuts down or
- * decides to disconnect the client.
  */
-void
-jack_shutdown (void *arg)
+void onMidiIn(double deltatime, std::vector< unsigned char> *message, void *userData)
 {
-	exit (1);
+  unsigned int mSize = message->size();
+  if(mSize>0)
+  commandByte = message->at(0);
+	command = (commandByte>>4)&7;
+	channel = commandByte & 15;
+	if(mSize>1)
+	{
+		data1 = message->at(1);
+	}
+	if(mSize>2)
+	{
+		data2 = message->at(2);
+	}
+	switch (command)
+	{
+	
+          case 0:
+          //printMidiMessage(command,data1,data2);
+		  printf("NOTEOFF   CH:%02d note:%03d vel:%03d\n",channel,data1,data2);
+          handleNoteOff(channel,data1,data2);
+          mstate = WAIT_COMMAND;
+          break;
+          case 1:
+		  printf("NOTEON    CH:%02d note:%03d vel:%03d\n",channel,data1,data2);
+          //printMidiMessage(command>,data1,data2);
+          handleNoteOn(channel,data1,data2);
+          mstate = WAIT_COMMAND;
+          break;
+          case 3:
+		  printf("CC        CH:%02d note:%03d vel:%03d",channel,data1,data2);
+          handleCC(channel, data1, data2,&value_pickup[0]);
+          mstate = WAIT_COMMAND;
+          break;
+          case 6:
+		  printf("PITCHBEND CH:%02d data1:%03d data2:%03d",channel,data1,data2);
+          handlePitchBend(channel,data1,data2);
+          mstate = WAIT_COMMAND;
+          break;
+		default:
+		break;
+  }
 }
 
+int renderAudio(void* outputBuffer, void *inputBuffer, unsigned int nBufferFrames, double streamTime, RtAudioStreamStatus status, void* userData)
+{
+  double*buffer = (double *) outputBuffer;
+  for(int i=0;i<nBufferFrames;i=i+2)
+  {
+    float f = getSample();
+    *buffer++=f;
+    *buffer++=f;
+  }
 
+  return 0;
+}
+void initRtAudio()
+{
 
+  int audiodevcount = dac.getDeviceCount();
+  if(audiodevcount<1)
+  {
+    std::cout << "\nNo audio devices found!\n";
+    exit(0);
+  }
+  else
+  {
+    std::cout << "\nFound " << audiodevcount << " devices!\n";
+  }
+  RtAudio::StreamParameters parameters;
+  parameters.deviceId = dac.getDefaultOutputDevice();
+  parameters.nChannels = 2;
+  parameters.firstChannel = 0;
+  unsigned int bufferFrames = 256;
+  double data[2];
+  try
+  {
+    dac.openStream(&parameters, NULL, RTAUDIO_FLOAT64, SAMPLE_RATE,&bufferFrames, &renderAudio, (void* )&data);
+    dac.startStream();
+  }
+  catch(const std::exception& e)
+  {
+    std::cerr << e.what() << '\n';
+  }
+  
+}
+void initRtMidi(int midiport)
+{
+  try {
+    midiin = new RtMidiIn();
+  }
+  catch ( RtMidiError &error ) {
+    error.printMessage();
+    exit( EXIT_FAILURE );
+  }
+  // Check inputs.
+  unsigned int nPorts = midiin->getPortCount();
+  std::cout << "\nThere are " << nPorts << " MIDI input sources available.\n";
+  std::string portName;
+  for ( unsigned int i=0; i<nPorts; i++ ) {
+    try {
+      portName = midiin->getPortName(i);
+    }
+    catch ( RtMidiError &error ) {
+      error.printMessage();
+      
+    }
+    std::cout << "  Input Port #" << i << ": " << portName << '\n';
+  }
+  midiin->openPort(midiport);
+  midiin->setCallback(&onMidiIn);
+  midiin->ignoreTypes(false,false,false);
+    
+}
 int
 main (int argc, char *argv[])
 {
-	const char **ports;
-	const char *client_name = "intsynth";
-	const char *server_name = NULL;
-	jack_options_t options = JackNullOption;
-	jack_status_t status;
+  int midiportnum = 0;
 	setup();
-	/* open a client connection to the JACK server */
+  printf("%d argument(s)\n",argc);
+  for(int i=0;i<argc;i++)
+  {
+    printf("argument %d:%s\n",i,argv[i]);
+    
+    if(strstr(argv[i],"/midiport=")>0)
+    {
+      char* midiportarg = strtok(argv[i],"=");
+      midiportarg = strtok(NULL,"=");
+      midiportnum = atoi(midiportarg);
 
-	client = jack_client_open (client_name, options, &status, server_name);
-	if (client == NULL) {
-		fprintf (stderr, "jack_client_open() failed, "
-			 "status = 0x%2.0x\n", status);
-		if (status & JackServerFailed) {
-			fprintf (stderr, "Unable to connect to JACK server\n");
-		}
-		exit (1);
-	}
-	if (status & JackServerStarted) {
-		fprintf (stderr, "JACK server started\n");
-	}
-	if (status & JackNameNotUnique) {
-		client_name = jack_get_client_name(client);
-		fprintf (stderr, "unique name `%s' assigned\n", client_name);
-	}
+    }
+    printf("midiport to use = %d\n",midiportnum);
 
-	/* tell the JACK server to call `process()' whenever
-	   there is work to be done.
-	*/
 
-	jack_set_process_callback (client, process, 0);
 
-	/* tell the JACK server to call `jack_shutdown()' if
-	   it ever shuts down, either entirely, or if it
-	   just decides to stop calling us.
-	*/
 
-	jack_on_shutdown (client, jack_shutdown, 0);
-
-	/* display the current sample rate. 
-	 */
-	
-	printf ("engine sample rate: %" PRIu32 "\n",
-		jack_get_sample_rate (client));
-
-	/* create two ports */
-
-	input_port = jack_port_register (client, "input",
-					 JACK_DEFAULT_AUDIO_TYPE,
-					 JackPortIsInput, 0);
-	output_port = jack_port_register (client, "output",
-					  JACK_DEFAULT_AUDIO_TYPE,
-					  JackPortIsOutput, 0);
-	midi_input_port = jack_port_register(client, "midi_in",JACK_DEFAULT_MIDI_TYPE,JackPortIsInput,0);
-	if ((input_port == NULL) || (output_port == NULL) || midi_input_port==NULL) {
-		fprintf(stderr, "no more JACK ports available\n");
-		exit (1);
-	}
-
-	/* Tell the JACK server that we are ready to roll.  Our
-	 * process() callback will start running now. */
-
-	if (jack_activate (client)) {
-		fprintf (stderr, "cannot activate client");
-		exit (1);
-	}
-
-	/* Connect the ports.  You can't do this before the client is
-	 * activated, because we can't make connections to clients
-	 * that aren't running.  Note the confusing (but necessary)
-	 * orientation of the driver backend ports: playback ports are
-	 * "input" to the backend, and capture ports are "output" from
-	 * it.
-	 */
-
-	ports = jack_get_ports (client, NULL, NULL,
-				JackPortIsPhysical|JackPortIsOutput);
-	if (ports == NULL) {
-		fprintf(stderr, "no physical capture ports\n");
-		exit (1);
-	}
-
-	if (jack_connect (client, ports[0], jack_port_name (input_port))) {
-		fprintf (stderr, "cannot connect input ports\n");
-	}
-
-	free (ports);
-	
-	ports = jack_get_ports (client, NULL, NULL,
-				JackPortIsPhysical|JackPortIsInput);
-	if (ports == NULL) {
-		fprintf(stderr, "no physical playback ports\n");
-		exit (1);
-	}
-
-	if (jack_connect (client, jack_port_name (output_port), ports[0])) {
-		fprintf (stderr, "cannot connect output ports\n");
-	}
-
-	free (ports);
-
-	/* keep running until stopped by the user */
-
-	sleep (-1);
-
-	/* this is never reached but if the program
-	   had some other way to exit besides being killed,
-	   they would be important to call.
-	*/
-
-	jack_client_close (client);
-	exit (0);
+  }
+  initRtAudio();
+  initRtMidi(midiportnum);
+  
+  
+  while(running)
+  {
+    sleep(1);
+  }
+  return 0;
 }
 

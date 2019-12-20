@@ -38,11 +38,13 @@ public:
         }
     }
     ~NumWaveTableOsc(void) {
+        /*
         for (int idx = 0; idx < numWaveTableSlots; idx++) {
             int8_t *temp = mWaveTables[idx].waveTable;
             if (temp != 0)
                 delete [] temp;
         }
+        */
     }
 
 
