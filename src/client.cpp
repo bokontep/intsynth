@@ -149,14 +149,7 @@ volatile unsigned long t_diff;
 volatile unsigned long t_counter = 0;
 volatile double avg_time_micros = 0;
 volatile int shift = 0;
-/**
- * The process callback for this JACK application is called in a
- * special realtime thread once for each audio cycle.
- *
- * This client does nothing more than copy data from its input
- * port to its output port. It will exit when stopped by 
- * the user (e.g. using Ctrl-C on a unix-ish operating system)
- */
+
 void setup()
 {
 	for(int i=0;i<NUM_VOICES;i++)
@@ -181,7 +174,7 @@ void setup()
   for(int i =0;i<NUM_VOICES;i++)
   {
     voices[i] = SynthVoice(SAMPLE_RATE);
-    voices[i].AddOsc1SharedWaveTable(WTLEN,fp_sinWaveTable);
+    voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_sinWaveTable[0]);
     voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_sawWaveTable[0]);
     voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_triWaveTable[0]);
     voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_squWaveTable[0]);
@@ -189,7 +182,7 @@ void setup()
     voices[i].AddOsc1SharedWaveTable(WTLEN,&fp_rndWaveTable[0]);
     voices[i].SetOsc1ADSR(10,1,1.0,1000);
     
-    voices[i].AddOsc2SharedWaveTable(WTLEN,fp_sinWaveTable);
+    voices[i].AddOsc2SharedWaveTable(WTLEN,&fp_sinWaveTable[0]);
     voices[i].AddOsc2SharedWaveTable(WTLEN,&fp_sawWaveTable[0]);
     voices[i].AddOsc2SharedWaveTable(WTLEN,&fp_triWaveTable[0]);
     voices[i].AddOsc2SharedWaveTable(WTLEN,&fp_squWaveTable[0]);
@@ -632,12 +625,12 @@ void onMidiIn(double deltatime, std::vector< unsigned char> *message, void *user
           mstate = WAIT_COMMAND;
           break;
           case 3:
-		  printf("CC        CH:%02d note:%03d vel:%03d",channel,data1,data2);
+		  printf("CC        CH:%02d note:%03d vel:%03d\n",channel,data1,data2);
           handleCC(channel, data1, data2,&value_pickup[0]);
           mstate = WAIT_COMMAND;
           break;
           case 6:
-		  printf("PITCHBEND CH:%02d data1:%03d data2:%03d",channel,data1,data2);
+		  printf("PITCHBEND CH:%02d data1:%03d data2:%03d\n",channel,data1,data2);
           handlePitchBend(channel,data1,data2);
           mstate = WAIT_COMMAND;
           break;
@@ -649,11 +642,11 @@ void onMidiIn(double deltatime, std::vector< unsigned char> *message, void *user
 int renderAudio(void* outputBuffer, void *inputBuffer, unsigned int nBufferFrames, double streamTime, RtAudioStreamStatus status, void* userData)
 {
   double*buffer = (double *) outputBuffer;
-  for(int i=0;i<nBufferFrames;i=i+2)
+  for(int i=0;i<nBufferFrames;i++)
   {
     float f = getSample();
     *buffer++=f;
-    *buffer++=f;
+    
   }
 
   return 0;
@@ -673,7 +666,7 @@ void initRtAudio()
   }
   RtAudio::StreamParameters parameters;
   parameters.deviceId = dac.getDefaultOutputDevice();
-  parameters.nChannels = 2;
+  parameters.nChannels = 1;
   parameters.firstChannel = 0;
   unsigned int bufferFrames = 256;
   double data[2];
@@ -743,6 +736,7 @@ main (int argc, char *argv[])
   initRtMidi(midiportnum);
   
   
+
   while(running)
   {
     sleep(1);
