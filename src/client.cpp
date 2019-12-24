@@ -39,7 +39,7 @@ int8_t fp_plsWaveTable[WTLEN];
 int8_t fp_rndWaveTable[WTLEN];
 uint8_t dwfbuf_l[128];
 uint8_t dwfbuf_r[128];
-
+volatile int voices_playing = 0;
 char line1[17];
 char line2[17];
 uint8_t dwfidx=0;
@@ -198,26 +198,26 @@ float getSample()
 {
 	  
   int64_t s = 0;
-  uint8_t data=0;
+  //uint8_t data=0;
   
   for(int i=0;i<NUM_VOICES;i++)
   {
-    s = s + (int32_t)(voices[i].Process() + Num(127)); 
+    s = s + (int32_t)voices[i].Process() ; 
   }
-  data = (s/(NUM_VOICES));
-  dwfbuf_l[dwfidx]=data;
+  //data = s;///(NUM_VOICES>>1);// (s/(NUM_VOICES));
+  //dwfbuf_l[dwfidx]=data;
   
     //s = ((int32_t)nsinosc.Process())+128;
      //s = s+(fpsinosc[i].Process())>>16;
      //s = nsinosc.Process()>>10;
-  s = 0;
-  for(int i=0;i<NUM_DRUMS;i++)
-  {
-    s = s + (int32_t)(drums[i].Process() + Num(127));
-  }
+  //s = 0;
+  //for(int i=0;i<NUM_DRUMS;i++)
+  //{
+  //  s = s + (int32_t)(drums[i].Process() + Num(127));
+  //}
   
   t_counter++;
-  return data/255.0;
+  return (float)((float)s/1024.0);
 }
 void handleNoteOn(uint8_t channel, uint8_t note, uint8_t velocity)
 {
@@ -238,6 +238,7 @@ void handleNoteOn(uint8_t channel, uint8_t note, uint8_t velocity)
         
         voices[i].MidiNoteOn(note,velocity);
         found = true;
+        voices_playing++;
         return;
       }
       if(voices_notes[i]>maxnote)
@@ -282,6 +283,7 @@ void handleNoteOff(uint8_t channel, uint8_t note, uint8_t velocity)
       {
         voices_notes[i]=-1;
         voices[i].MidiNoteOff();
+        voices_playing--;
         //break;
       }
     }
@@ -651,7 +653,7 @@ int renderAudio(void* outputBuffer, void *inputBuffer, unsigned int nBufferFrame
 
   return 0;
 }
-void initRtAudio()
+void initRtAudio(int audiodeviceid)
 {
 
   int audiodevcount = dac.getDeviceCount();
@@ -664,8 +666,12 @@ void initRtAudio()
   {
     std::cout << "\nFound " << audiodevcount << " devices!\n";
   }
+  for(int i=0;i<audiodevcount;i++)
+  {
+    std::cout << "\n Device id=" << i << "" << dac.getDeviceInfo(i).name <<"\n";
+  }
   RtAudio::StreamParameters parameters;
-  parameters.deviceId = dac.getDefaultOutputDevice();
+  parameters.deviceId = audiodeviceid;
   parameters.nChannels = 1;
   parameters.firstChannel = 0;
   unsigned int bufferFrames = 256;
@@ -713,7 +719,8 @@ int
 main (int argc, char *argv[])
 {
   int midiportnum = 0;
-	setup();
+	int devicenum = 0;
+  setup();
   printf("%d argument(s)\n",argc);
   for(int i=0;i<argc;i++)
   {
@@ -726,13 +733,23 @@ main (int argc, char *argv[])
       midiportnum = atoi(midiportarg);
 
     }
+    
     printf("midiport to use = %d\n",midiportnum);
 
+  if(strstr(argv[i],"/audiodevice=")>0)
+    {
+      char* audiodevicearg = strtok(argv[i],"=");
+      audiodevicearg = strtok(NULL,"=");
+      devicenum = atoi(audiodevicearg);
 
+    }
+    
+    printf("audiodevice to use = %d\n",devicenum);
+  
 
 
   }
-  initRtAudio();
+  initRtAudio(devicenum);
   initRtMidi(midiportnum);
   
   
