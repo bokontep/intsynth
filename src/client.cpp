@@ -648,6 +648,7 @@ int renderAudio(void* outputBuffer, void *inputBuffer, unsigned int nBufferFrame
   {
     float f = getSample();
     *buffer++=f;
+    *buffer++=f;
     
   }
 
@@ -672,12 +673,14 @@ void initRtAudio(int audiodeviceid)
   }
   RtAudio::StreamParameters parameters;
   parameters.deviceId = audiodeviceid;
-  parameters.nChannels = 1;
+  
+  parameters.nChannels = 2;
   parameters.firstChannel = 0;
-  unsigned int bufferFrames = 256;
+  unsigned int bufferFrames = 64;
   double data[2];
   try
   {
+    
     dac.openStream(&parameters, NULL, RTAUDIO_FLOAT64, SAMPLE_RATE,&bufferFrames, &renderAudio, (void* )&data);
     dac.startStream();
   }
