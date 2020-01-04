@@ -654,7 +654,7 @@ int renderAudio(void* outputBuffer, void *inputBuffer, unsigned int nBufferFrame
 
   return 0;
 }
-void initRtAudio(int audiodeviceid)
+void initRtAudio(int audiodeviceid, int buffersize)
 {
 
   int audiodevcount = dac.getDeviceCount();
@@ -669,14 +669,15 @@ void initRtAudio(int audiodeviceid)
   }
   for(int i=0;i<audiodevcount;i++)
   {
-    std::cout << "\n Device id=" << i << "" << dac.getDeviceInfo(i).name <<"\n";
+    std::cout << "\n Device id=" << i << " [" << dac.getDeviceInfo(i).name <<"]\n";
   }
+
   RtAudio::StreamParameters parameters;
   parameters.deviceId = audiodeviceid;
   
   parameters.nChannels = 2;
   parameters.firstChannel = 0;
-  unsigned int bufferFrames = 64;
+  unsigned int bufferFrames = buffersize;
   double data[2];
   try
   {
@@ -723,8 +724,13 @@ main (int argc, char *argv[])
 {
   int midiportnum = 0;
 	int devicenum = 0;
+  int buffersize = 128;
   setup();
   printf("%d argument(s)\n",argc);
+  if(argc<2)
+  {
+    std::cout << "intsynth. Usage: intsynth /midiport=X /audiodevice=Y /buffersize=Z, where X is the midiport id, Y is the audio device id, Z is the buffer size (powers of 2, greater than 32 in most cases)\n";
+  }
   for(int i=0;i<argc;i++)
   {
     printf("argument %d:%s\n",i,argv[i]);
@@ -739,7 +745,7 @@ main (int argc, char *argv[])
     
     printf("midiport to use = %d\n",midiportnum);
 
-  if(strstr(argv[i],"/audiodevice=")>0)
+    if(strstr(argv[i],"/audiodevice=")>0)
     {
       char* audiodevicearg = strtok(argv[i],"=");
       audiodevicearg = strtok(NULL,"=");
@@ -749,10 +755,16 @@ main (int argc, char *argv[])
     
     printf("audiodevice to use = %d\n",devicenum);
   
-
+    if(strstr(argv[i],"/buffersize=")>0)
+    {
+      char* buffersizearg = strtok(argv[i],"=");
+      buffersizearg = strtok(NULL,"=");
+      buffersize = atoi(buffersizearg);
+    }
 
   }
-  initRtAudio(devicenum);
+  
+  initRtAudio(devicenum,buffersize);
   initRtMidi(midiportnum);
   
   
