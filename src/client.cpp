@@ -735,7 +735,7 @@ main (int argc, char *argv[])
   {
     printf("argument %d:%s\n",i,argv[i]);
     
-    if(strstr(argv[i],"/midiport=")>0)
+    if(strstr(argv[i],"/midiport=")>(char*)0)
     {
       char* midiportarg = strtok(argv[i],"=");
       midiportarg = strtok(NULL,"=");
@@ -745,7 +745,7 @@ main (int argc, char *argv[])
     
     printf("midiport to use = %d\n",midiportnum);
 
-    if(strstr(argv[i],"/audiodevice=")>0)
+    if(strstr(argv[i],"/audiodevice=")>(char*)0)
     {
       char* audiodevicearg = strtok(argv[i],"=");
       audiodevicearg = strtok(NULL,"=");
@@ -755,7 +755,7 @@ main (int argc, char *argv[])
     
     printf("audiodevice to use = %d\n",devicenum);
   
-    if(strstr(argv[i],"/buffersize=")>0)
+    if(strstr(argv[i],"/buffersize=")>(char*)0)
     {
       char* buffersizearg = strtok(argv[i],"=");
       buffersizearg = strtok(NULL,"=");

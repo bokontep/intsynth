@@ -1,0 +1,3 @@
+/home/mpriz/intsynth/CMakeFiles/intsynth.dir
+/home/mpriz/intsynth/CMakeFiles/edit_cache.dir
+/home/mpriz/intsynth/CMakeFiles/rebuild_cache.dir
